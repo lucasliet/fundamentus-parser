@@ -7,7 +7,7 @@ app.use(json());
 
 const fundamentusData: string =
   await fetch('https://www.fundamentus.com.br/resultado.php')
-    .then((response) => response.text())
+    .then((response) => response.text());
 
 const stocksElement: Element =
   new DOMParser().parseFromString(fundamentusData, 'text/html')
@@ -17,13 +17,18 @@ const headers: string[] =
   Array.from(stocksElement!.querySelector('thead tr')!.children)
     .map((headerEl: Element) => headerEl.textContent);
 
-const stocks: { [header: string]: string }[][] =
+type Stock = { [header: string]: string };
+const stocks: Stock[] =
   Array.from(stocksElement!.querySelectorAll('tbody tr'))
-    .map((row: Node) =>
-      Array.from((row as Element).children).map((value: Element, index: number) =>
-        ({ [headers[index]]: value.textContent })
-      )
-    );
+    .map((row: Node) =>{
+      const stock: Stock = {};
+      Array.from((row as Element).children).map((value: Element, index: number) => {
+        stock[headers[index]] = value.textContent;
+      })
+      return stock;
+    });
+
+console.info(`📈 collected ${stocks.length} stocks, ${JSON.stringify(stocks[0])}...`);
 
 app.get("/", (_, res) => res.send(stocks));
 
