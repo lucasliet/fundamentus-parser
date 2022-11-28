@@ -7,7 +7,14 @@ app.use(json());
 
 const fundamentusData: string =
   await fetch('https://www.fundamentus.com.br/resultado.php')
-    .then((response) => response.text());
+    .then((response: Response) => response.text())
+    .then((html: string) =>
+      html.replace(/Cota��o/g, 'Cotação')
+        .replace(/D�v.Brut\/ Patrim./g, 'Dív.Brut/Patrim.')
+        .replace(/Mrg\. L�q\./g, 'Mrg. Líq.')
+        .replace(/Patrim\. L�q/g, 'Patrim. Líq')
+        .replace(/D�v\.Brut\/ Patrim\./g, 'Dív.Brut/Patrim.')
+    );
 
 const stocksElement: Element =
   new DOMParser().parseFromString(fundamentusData, 'text/html')
@@ -20,7 +27,7 @@ const headers: string[] =
 type Stock = { [header: string]: string };
 const stocks: Stock[] =
   Array.from(stocksElement!.querySelectorAll('tbody tr'))
-    .map((row: Node) =>{
+    .map((row: Node) => {
       const stock: Stock = {};
       Array.from((row as Element).children).map((value: Element, index: number) => {
         stock[headers[index]] = value.textContent;
@@ -34,7 +41,7 @@ app.get("/", (_, res) => res.send(stocks));
 
 app.get("/:paper", (req, res) => {
   const paper = req.params.paper.toUpperCase();
-  const stock = stocks.find((stock) => stock.Papel === paper);
+  const stock = stocks.find((stock: Stock) => stock.Papel === paper);
   if (stock) {
     res.send(stock);
   } else {
