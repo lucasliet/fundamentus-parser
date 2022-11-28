@@ -32,4 +32,15 @@ console.info(`📈 collected ${stocks.length} stocks, ${JSON.stringify(stocks[0]
 
 app.get("/", (_, res) => res.send(stocks));
 
+app.get("/:paper", (req, res) => {
+  const paper = req.params.paper.toUpperCase();
+  const stock = stocks.find((stock) => stock.Papel === paper);
+  if (stock) {
+    res.send(stock);
+  } else {
+    res.status = 404;
+    res.send({ error: `stock ${paper} not found` });
+  }
+});
+
 app.listen(3333);
