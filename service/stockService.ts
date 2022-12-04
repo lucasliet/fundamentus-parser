@@ -3,6 +3,11 @@ import { Stock } from '../types/Stock.d.ts';
 
 const DOM_PARSER = new DOMParser();
 
+const NUMBER_FORMATTER = new Intl.NumberFormat('pt-BR', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
 const INVESTIDOR10_URL = 'https://investidor10.com.br/acoes/rankings/acoes-mais-baratas-benjamin-graham/'
 const FUNDAMENTUS_URL = 'https://www.fundamentus.com.br/resultado.php'
 
@@ -42,7 +47,14 @@ function parseGrahamStocks(investidor10Html: string): Promise<Stock[]> {
 
 async function crawler(url: string): Promise<string> {
   return await fetch(url)
-    .then((response: Response) => response.text());
+    .then((response: Response) => response.text())
+    .then((html: string) =>
+      html.replace(/Cota��o/g, 'Cotação')
+        .replace(/D�v.Brut\/ Patrim./g, 'Dív.Brut/Patrim.')
+        .replace(/Mrg\. L�q\./g, 'Mrg. Líq.')
+        .replace(/Patrim\. L�q/g, 'Patrim. Líq')
+        .replace(/D�v\.Brut\/ Patrim\./g, 'Dív.Brut/Patrim.')
+    );
 }
 
 function parseElement(html: string, selector: string): Element {
@@ -77,8 +89,12 @@ function sortStocksByGrahamUpside(stocks: Stock[]) {
 function addGrahamValueTo(stocks: Stock[], grahamStocks: Stock[]) {
   return stocks.map((stock: Stock) => {
     const grahamStock = grahamStocks.find((grahamStock: Stock) => grahamStock.Papel === stock.Papel);
-    stock.graham = grahamStock ? grahamStock['Preço Justode Graham'] : '0';
-    stock.upside = grahamStock ? grahamStock['Upside(Graham)'] : '0';
+    stock.graham = grahamStock ? formatPercentValue(grahamStock['Preço Justode Graham']) : '0';
+    stock.upside = grahamStock ? formatPercentValue(grahamStock['Upside(Graham)']) : '0';
     return stock;
   });
+}
+
+function formatPercentValue(value: string): string {
+  return NUMBER_FORMATTER.format(parseFloat(value))+'%'
 }
