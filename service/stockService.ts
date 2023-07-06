@@ -8,21 +8,12 @@ const NUMBER_FORMATTER = new Intl.NumberFormat('pt-BR', {
   maximumFractionDigits: 2,
 });
 
-const INVESTIDOR10_URL = 'https://investidor10.com.br/acoes/rankings/acoes-mais-baratas-benjamin-graham/'
-const FUNDAMENTUS_URL = 'https://www.fundamentus.com.br/resultado.php'
+const FUNDAMENTUS_URL = 'https://www.fundamentus.com.br/resultado.php?&interface=classic'
 
 export async function getStocks(): Promise<Stock[]> {
-  const [fundamentusHtml, investidor10Html] = await Promise.all([
-    crawler(FUNDAMENTUS_URL),
-    crawler(INVESTIDOR10_URL),
-  ]);
-
-  const [fundamentusStocks, grahamStocks] = await Promise.all([
-    parseFundamentusStocks(fundamentusHtml),
-    parseGrahamStocks(investidor10Html),
-  ]);
-
-  const stocks = addGrahamValueTo(fundamentusStocks, grahamStocks);
+  const fundamentusHtml = await crawler(FUNDAMENTUS_URL);
+  const fundamentusStocks = await parseFundamentusStocks(fundamentusHtml);
+  const stocks = addGrahamValueTo(fundamentusStocks);
   return sortStocksByGrahamUpside(stocks);
 }
 
@@ -30,16 +21,6 @@ function parseFundamentusStocks(fundamentusHtml: string): Promise<Stock[]> {
   return new Promise((resolve) => {
     const stocksElement = parseElement(fundamentusHtml, '#resultado');
     const headers = parseHeaders(stocksElement);
-    const stocks = parseStocks(stocksElement, headers);
-    resolve(stocks);
-  });
-}
-
-function parseGrahamStocks(investidor10Html: string): Promise<Stock[]> {
-  return new Promise((resolve) => {
-    const stocksElement = parseElement(investidor10Html, '#rankigns');
-    const headers = parseHeaders(stocksElement);
-    headers[0] = 'Papel';
     const stocks = parseStocks(stocksElement, headers);
     resolve(stocks);
   });
@@ -86,15 +67,23 @@ function sortStocksByGrahamUpside(stocks: Stock[]) {
   });
 }
 
-function addGrahamValueTo(stocks: Stock[], grahamStocks: Stock[]) {
+function addGrahamValueTo(stocks: Stock[]) {
   return stocks.map((stock: Stock) => {
-    const grahamStock = grahamStocks.find((grahamStock: Stock) => grahamStock.Papel === stock.Papel);
-    stock.graham = grahamStock ? formatPercentValue(grahamStock['Preço Justode Graham']) : '0';
-    stock.upside = grahamStock ? formatPercentValue(grahamStock['Upside(Graham)']) : '0';
+    const pl = parseFloat(stock['P/L'].replace(',', '.'));
+    const pvp = parseFloat(stock['P/VP'].replace(',', '.'));
+    const price = parseFloat(stock['Cotação'].replace(',', '.'));
+    const lpa = price / pl;
+    const vpa = price / pvp;
+    const grahamValue = Math.sqrt(22.5 * lpa * vpa);
+    const upside = ((grahamValue / price) - 1) * 100;
+    stock.lpa = NUMBER_FORMATTER.format(lpa);
+    stock.vpa = NUMBER_FORMATTER.format(vpa);
+    stock.graham = formatPercentValue(grahamValue);
+    stock.upside = formatPercentValue(upside);
     return stock;
   });
 }
 
-function formatPercentValue(value: string): string {
-  return NUMBER_FORMATTER.format(parseFloat(value))+'%'
+function formatPercentValue(value: number): string {
+  return NUMBER_FORMATTER.format(value)+'%'
 }
