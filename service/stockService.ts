@@ -81,7 +81,7 @@ function addGrahamValueTo(stocks: Stock[]) {
     stock.graham = NUMBER_FORMATTER.format(grahamValue);
     stock.upside = formatPercentValue(upside);
     return stock;
-  });
+  }).filter((stock: Stock) => stock.graham > 0);
 }
 
 function formatPercentValue(value: number): string {
