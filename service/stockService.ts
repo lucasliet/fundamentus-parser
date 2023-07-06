@@ -60,11 +60,12 @@ function parseStocks(document: Element, headers: string[]): Stock[] {
 }
 
 function sortStocksByGrahamUpside(stocks: Stock[]) {
-  return stocks.sort((a: Stock, b: Stock) => {
-    const aUpside = parseFloat(a.upside.replace('%', '').replace(',', '.'));
-    const bUpside = parseFloat(b.upside.replace('%', '').replace(',', '.'));
-    return bUpside - aUpside;
-  });
+  return stocks.filter((stock: Stock) => parseFloat(stock.graham) > 0)
+    .sort((a: Stock, b: Stock) => {
+      const aUpside = parseFloat(a.upside.replace('%', '').replace(',', '.'));
+      const bUpside = parseFloat(b.upside.replace('%', '').replace(',', '.'));
+      return bUpside - aUpside;
+    });
 }
 
 function addGrahamValueTo(stocks: Stock[]) {
@@ -81,7 +82,7 @@ function addGrahamValueTo(stocks: Stock[]) {
     stock.graham = NUMBER_FORMATTER.format(grahamValue);
     stock.upside = formatPercentValue(upside);
     return stock;
-  }).filter((stock: Stock) => stock.graham > 0);
+  });
 }
 
 function formatPercentValue(value: number): string {
