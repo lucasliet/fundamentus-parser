@@ -61,6 +61,7 @@ function parseStocks(document: Element, headers: string[]): Stock[] {
 
 function sortStocksByGrahamUpside(stocks: Stock[]) {
   return stocks.filter((stock: Stock) => parseFloat(stock.graham) > 0)
+    .filter((stock: Stock) => parseFloat(stock['P/L'].replace(',', '.')) > 0)
     .sort((a: Stock, b: Stock) => {
       const aUpside = parseFloat(a.upside.replace('%', '').replace(',', '.'));
       const bUpside = parseFloat(b.upside.replace('%', '').replace(',', '.'));
