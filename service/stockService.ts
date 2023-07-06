@@ -78,7 +78,7 @@ function addGrahamValueTo(stocks: Stock[]) {
     const upside = ((grahamValue / price) - 1) * 100;
     stock.lpa = NUMBER_FORMATTER.format(lpa);
     stock.vpa = NUMBER_FORMATTER.format(vpa);
-    stock.graham = formatPercentValue(grahamValue);
+    stock.graham = NUMBER_FORMATTER.format(grahamValue);
     stock.upside = formatPercentValue(upside);
     return stock;
   });
