@@ -6,6 +6,31 @@ import { Stock } from './types/Stock.d.ts';
 
 const app = opine();
 
+// Middleware de logging
+app.use(async (req, res, next) => {
+  const start = Date.now();
+  await next();
+  const ms = Date.now() - start;
+  console.log(`${req.method} ${req.url} - ${ms}ms`);
+});
+
+// Middleware para servir o robots.txt
+app.use(async (req, res, next) => {
+  if (req.url === '/robots.txt') {
+    try {
+      const robotsTxt = await Deno.readTextFile('./static/robots.txt');
+      res.setHeader('Content-Type', 'text/plain');
+      res.send(robotsTxt);
+    } catch (_error) {
+      res.status = 200;
+      res.setHeader('Content-Type', 'text/plain');
+      res.send('User-agent: *\nDisallow: /');
+    }
+  } else {
+    await next();
+  }
+});
+
 app.use(opineCors());
 app.use(json());
 
