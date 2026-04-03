@@ -1,0 +1,10 @@
+{
+  "tasks": {
+    "start": "deno run --allow-net --allow-read main.ts"
+  },
+  "imports": {
+    "hono": "jsr:@hono/hono",
+    "hono/cors": "jsr:@hono/hono/cors",
+    "deno-dom": "jsr:@b-fuze/deno-dom"
+  }
+}

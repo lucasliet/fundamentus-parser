@@ -1,4 +1,4 @@
-import { DOMParser, Element, Node } from 'https://deno.land/x/deno_dom@v0.1.36-alpha/deno-dom-wasm.ts';
+import { DOMParser, Element, Node } from "deno-dom";
 import { Stock } from '../types/Stock.d.ts';
 
 const DOM_PARSER = new DOMParser();

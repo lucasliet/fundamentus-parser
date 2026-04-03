@@ -1,54 +1,47 @@
-import opine, { json } from 'https://deno.land/x/opine@2.3.3/mod.ts';
-import { opineCors } from 'https://deno.land/x/cors@v1.2.2/mod.ts';
+import { Hono } from "hono";
+import { cors } from "hono/cors";
 
-import { getStocks } from './service/stockService.ts';
-import { Stock } from './types/Stock.d.ts';
+import { getStocks } from "./service/stockService.ts";
+import type { Stock } from "./types/Stock.d.ts";
 
-const app = opine();
+const app = new Hono();
 
 // Middleware de logging
-app.use(async (req, res, next) => {
+app.use(async (c, next) => {
   const start = Date.now();
   await next();
   const ms = Date.now() - start;
-  console.log(`${req.method} ${req.url} - ${ms}ms`);
+  console.log(`${c.req.method} ${c.req.url} - ${ms}ms`);
 });
 
 // Middleware para servir o robots.txt
-app.use(async (req, res, next) => {
-  if (req.url === '/robots.txt') {
+app.use(async (c, next) => {
+  if (c.req.path === "/robots.txt") {
     try {
-      const robotsTxt = await Deno.readTextFile('./static/robots.txt');
-      res.setHeader('Content-Type', 'text/plain');
-      res.send(robotsTxt);
+      const robotsTxt = await Deno.readTextFile("./static/robots.txt");
+      return c.text(robotsTxt);
     } catch (_error) {
-      res.status = 200;
-      res.setHeader('Content-Type', 'text/plain');
-      res.send('User-agent: *\nDisallow: /');
+      return c.text("User-agent: *\nDisallow: /");
     }
-  } else {
-    await next();
   }
+  await next();
 });
 
-app.use(opineCors());
-app.use(json());
+app.use("*", cors());
 
 const stocks = await getStocks();
 
-console.info(`📈 collected ${stocks.length} stocks, ${JSON.stringify(stocks[0])}`,);
+console.info(`📈 collected ${stocks.length} stocks, ${JSON.stringify(stocks[0])}`);
 
-app.get('/', (_, res) => res.json(stocks));
+app.get("/", (c) => c.json(stocks));
 
-app.get('/:paper', (req, res) => {
-  const paper = req.params.paper.toUpperCase();
+app.get("/:paper", (c) => {
+  const paper = c.req.param("paper").toUpperCase();
   const stock = stocks.find((stock: Stock) => stock.Papel === paper);
   if (stock) {
-    res.json(stock);
-  } else {
-    res.status = 404;
-    res.json({ error: `stock ${paper} not found` });
+    return c.json(stock);
   }
+  return c.json({ error: `stock ${paper} not found` }, 404);
 });
 
-app.listen(3333);
+Deno.serve({ port: 3333 }, app.fetch);
