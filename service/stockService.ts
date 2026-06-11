@@ -14,6 +14,16 @@ export async function getStocks(): Promise<Stock[]> {
   const fundamentusHtml = await crawler(FUNDAMENTUS_URL);
   const fundamentusStocks = await parseFundamentusStocks(fundamentusHtml);
   const stocks = addGrahamValueTo(fundamentusStocks);
+
+  for (const paper of ["AGRO3", "TUPY3"]) {
+    if (!stocks.some((stock) => stock.Papel === paper)) {
+      const stockDetail = await scrapeStockDetail(paper);
+      if (stockDetail) {
+        stocks.push(stockDetail);
+      }
+    }
+  }
+
   return sortStocksByGrahamUpside(stocks);
 }
 
