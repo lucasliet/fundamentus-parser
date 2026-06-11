@@ -15,12 +15,15 @@ export async function getStocks(): Promise<Stock[]> {
   const fundamentusStocks = await parseFundamentusStocks(fundamentusHtml);
   const stocks = addGrahamValueTo(fundamentusStocks);
 
-  for (const paper of ["AGRO3", "TUPY3"]) {
-    if (!stocks.some((stock) => stock.Papel === paper)) {
-      const stockDetail = await scrapeStockDetail(paper);
-      if (stockDetail) {
-        stocks.push(stockDetail);
-      }
+  const missingPapers = ["AGRO3", "TUPY3"].filter(
+    (paper) => !stocks.some((stock) => stock.Papel === paper),
+  );
+  const details = await Promise.all(
+    missingPapers.map((paper) => scrapeStockDetail(paper)),
+  );
+  for (const stockDetail of details) {
+    if (stockDetail) {
+      stocks.push(stockDetail);
     }
   }
 
