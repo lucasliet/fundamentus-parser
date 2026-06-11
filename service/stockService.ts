@@ -76,7 +76,8 @@ function addGrahamValueTo(stocks: Stock[]) {
     const price = parseFloat(stock['Cotação'].replace(',', '.'));
     const lpa = price / pl;
     const vpa = price / pvp;
-    const grahamValue = Math.sqrt(22.5 * lpa * vpa);
+    const grahamProduct = 22.5 * lpa * vpa;
+    const grahamValue = grahamProduct > 0 ? Math.sqrt(grahamProduct) : 0;
     const upside = ((grahamValue / price) - 1) * 100;
     stock.lpa = NUMBER_FORMATTER.format(lpa);
     stock.vpa = NUMBER_FORMATTER.format(vpa);
@@ -88,4 +89,47 @@ function addGrahamValueTo(stocks: Stock[]) {
 
 function formatPercentValue(value: number): string {
   return NUMBER_FORMATTER.format(value)+'%'
+}
+
+/**
+ * Scrapes details for a single stock paper and calculates its Graham value metrics.
+ *
+ * @param paper The stock ticker symbol.
+ * @returns A promise that resolves to the stock object or null if not found.
+ */
+export async function scrapeStockDetail(paper: string): Promise<Stock | null> {
+  const url = `https://www.fundamentus.com.br/detalhes.php?papel=${paper}`;
+  const html = await crawler(url);
+  if (html.includes('Nenhum papel encontrado')) {
+    return null;
+  }
+  const document = parseElement(html, 'body');
+  const details = parseStockDetails(document, paper);
+  const stock: Stock = {
+    'Papel': paper,
+    'Cotação': details['Cotação'] || '0,00',
+    'P/L': details['P/L'] || '0,00',
+    'P/VP': details['P/VP'] || '0,00'
+  };
+  const stocks = addGrahamValueTo([stock]);
+  return stocks[0];
+}
+
+/**
+ * Parses the labels and values from the stock detail page.
+ *
+ * @param document The Element of the page.
+ * @param paper The stock ticker symbol.
+ * @returns The populated stock object.
+ */
+function parseStockDetails(document: Element, paper: string): Stock {
+  const labels = Array.from(document.querySelectorAll('td.label'))
+    .map((element: Element) => element.textContent.replaceAll('?', '').trim());
+  const data = Array.from(document.querySelectorAll('td.data'))
+    .map((element: Element) => element.textContent.trim());
+  const stock: Stock = { 'Papel': paper };
+  labels.map((label: string, index: number) => {
+    stock[label] = data[index];
+  });
+  return stock;
 }
