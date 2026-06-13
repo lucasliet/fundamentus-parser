@@ -70,13 +70,13 @@ function buildStockInCanonicalOrder(raw: Record<string, string | null>): Stock {
 export function parseStockDetails(document: Element, paper: string): Stock {
   const labels = Array.from(document.querySelectorAll('td.label'))
     .map((element: Element) => element.textContent.replaceAll('?', '').trim());
-  const data = Array.from(document.querySelectorAll('td.data'))
+  const cellValues = Array.from(document.querySelectorAll('td.data'))
     .map((element: Element) => element.textContent.trim());
   const raw: Record<string, string | null> = { 'Papel': paper };
   labels.forEach((label: string, index: number) => {
     const header = DETAIL_LABEL_TO_HEADER[label];
     if (header && raw[header] === undefined) {
-      raw[header] = data[index];
+      raw[header] = cellValues[index];
     }
   });
   const fieldCount = Object.keys(raw).length - 1;

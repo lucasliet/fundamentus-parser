@@ -17,7 +17,7 @@ export function parseStocks(document: Element, headers: string[]): Stock[] {
   return Array.from(document.querySelectorAll('tbody tr'))
     .map((row: Node) => {
       const stock: Stock = {};
-      Array.from((row as Element).children).map((value: Element, index: number) => {
+      Array.from((row as Element).children).forEach((value: Element, index: number) => {
         stock[headers[index]] = value.textContent.replaceAll('\n', '').trim();
       });
       return stock;

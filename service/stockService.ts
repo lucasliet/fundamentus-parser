@@ -1,13 +1,13 @@
 import { Stock } from '../types/Stock.d.ts';
-import { crawler } from './crawler.ts';
-import { parseElement, parseHeaders, parseStocks } from './parser.ts';
+import { fetchPage } from './fundamentusFetch.ts';
+import { parseElement, parseHeaders, parseStocks } from './htmlTableParser.ts';
 import { parseStockDetails } from './detailMapper.ts';
 import { addGrahamValueTo, sortStocksByGrahamUpside } from './graham.ts';
 
 const FUNDAMENTUS_URL = 'https://www.fundamentus.com.br/resultado.php?&interface=classic';
 
 export async function getStocks(): Promise<Stock[]> {
-  const fundamentusHtml = await crawler(FUNDAMENTUS_URL);
+  const fundamentusHtml = await fetchPage(FUNDAMENTUS_URL);
   const fundamentusStocks = parseFundamentusStocks(fundamentusHtml);
   const stocks = addGrahamValueTo(fundamentusStocks);
   return sortStocksByGrahamUpside(stocks);
@@ -21,7 +21,7 @@ function parseFundamentusStocks(fundamentusHtml: string): Stock[] {
 
 export async function scrapeStockDetail(paper: string): Promise<Stock | null> {
   const url = `https://www.fundamentus.com.br/detalhes.php?papel=${paper}`;
-  const html = await crawler(url);
+  const html = await fetchPage(url);
   if (html.includes('Nenhum papel encontrado')) {
     return null;
   }

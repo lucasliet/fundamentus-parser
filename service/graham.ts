@@ -35,13 +35,15 @@ export function addGrahamValueTo(stocks: Stock[]) {
   });
 }
 
+function parseUpsidePercent(value: string): number {
+  return parseFloat(value.replace('%', '').replace(',', '.'));
+}
+
 export function sortStocksByGrahamUpside(stocks: Stock[]) {
   return stocks.filter((stock: Stock) =>
     stock.graham !== null && parseFloat(stock.graham) > 0 &&
     stock['P/L'] !== null && parseFloat(stock['P/L'].replace(',', '.')) > 0
-  ).sort((a: Stock, b: Stock) => {
-    const aUpside = parseFloat(a.upside!.replace('%', '').replace(',', '.'));
-    const bUpside = parseFloat(b.upside!.replace('%', '').replace(',', '.'));
-    return bUpside - aUpside;
-  });
+  ).sort((a: Stock, b: Stock) =>
+    parseUpsidePercent(b.upside as string) - parseUpsidePercent(a.upside as string)
+  );
 }
