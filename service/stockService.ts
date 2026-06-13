@@ -15,18 +15,6 @@ export async function getStocks(): Promise<Stock[]> {
   const fundamentusStocks = await parseFundamentusStocks(fundamentusHtml);
   const stocks = addGrahamValueTo(fundamentusStocks);
 
-  const missingPapers = ["AGRO3", "TUPY3"].filter(
-    (paper) => !stocks.some((stock) => stock.Papel === paper),
-  );
-  const details = await Promise.all(
-    missingPapers.map((paper) => scrapeStockDetail(paper)),
-  );
-  for (const stockDetail of details) {
-    if (stockDetail) {
-      stocks.push(stockDetail);
-    }
-  }
-
   return sortStocksByGrahamUpside(stocks);
 }
 
@@ -40,15 +28,10 @@ function parseFundamentusStocks(fundamentusHtml: string): Promise<Stock[]> {
 }
 
 async function crawler(url: string): Promise<string> {
-  return await fetch(url)
-    .then((response: Response) => response.text())
-    .then((html: string) =>
-      html.replace(/Cota��o/g, 'Cotação')
-        .replace(/D�v.Brut\/ Patrim./g, 'Dív.Brut/Patrim.')
-        .replace(/Mrg\. L�q\./g, 'Mrg. Líq.')
-        .replace(/Patrim\. L�q/g, 'Patrim. Líq')
-        .replace(/D�v\.Brut\/ Patrim\./g, 'Dív.Brut/Patrim.')
-    );
+  const response = await fetch(url);
+  const buffer = await response.arrayBuffer();
+  const decoder = new TextDecoder('iso-8859-1');
+  return decoder.decode(buffer);
 }
 
 function parseElement(html: string, selector: string): Element {
@@ -73,30 +56,39 @@ function parseStocks(document: Element, headers: string[]): Stock[] {
 }
 
 function sortStocksByGrahamUpside(stocks: Stock[]) {
-  return stocks.filter((stock: Stock) => parseFloat(stock.graham) > 0)
-    .filter((stock: Stock) => parseFloat(stock['P/L'].replace(',', '.')) > 0)
-    .sort((a: Stock, b: Stock) => {
-      const aUpside = parseFloat(a.upside.replace('%', '').replace(',', '.'));
-      const bUpside = parseFloat(b.upside.replace('%', '').replace(',', '.'));
-      return bUpside - aUpside;
-    });
+  return stocks.filter((stock: Stock) =>
+    stock.graham !== null && parseFloat(stock.graham) > 0 &&
+    stock['P/L'] !== null && parseFloat(stock['P/L'].replace(',', '.')) > 0
+  ).sort((a: Stock, b: Stock) => {
+    const aUpside = parseFloat(a.upside!.replace('%', '').replace(',', '.'));
+    const bUpside = parseFloat(b.upside!.replace('%', '').replace(',', '.'));
+    return bUpside - aUpside;
+  });
 }
 
 function addGrahamValueTo(stocks: Stock[]) {
   return stocks.map((stock: Stock) => {
-    const pl = parseFloat(stock['P/L'].replace(',', '.'));
-    const pvp = parseFloat(stock['P/VP'].replace(',', '.'));
-    const price = parseFloat(stock['Cotação'].replace(',', '.'));
+    const plStr = stock['P/L'];
+    const pvpStr = stock['P/VP'];
+    const priceStr = stock['Cotação'];
+    if (!plStr || !pvpStr || !priceStr) {
+      return { ...stock, lpa: null, vpa: null, graham: null, upside: null };
+    }
+    const pl = parseFloat(plStr.replace(',', '.'));
+    const pvp = parseFloat(pvpStr.replace(',', '.'));
+    const price = parseFloat(priceStr.replace(',', '.'));
     const lpa = price / pl;
     const vpa = price / pvp;
     const grahamProduct = 22.5 * lpa * vpa;
     const grahamValue = grahamProduct > 0 ? Math.sqrt(grahamProduct) : 0;
     const upside = ((grahamValue / price) - 1) * 100;
-    stock.lpa = NUMBER_FORMATTER.format(lpa);
-    stock.vpa = NUMBER_FORMATTER.format(vpa);
-    stock.graham = NUMBER_FORMATTER.format(grahamValue);
-    stock.upside = formatPercentValue(upside);
-    return stock;
+    return {
+      ...stock,
+      lpa: NUMBER_FORMATTER.format(lpa),
+      vpa: NUMBER_FORMATTER.format(vpa),
+      graham: NUMBER_FORMATTER.format(grahamValue),
+      upside: formatPercentValue(upside),
+    };
   });
 }
 
@@ -117,13 +109,7 @@ export async function scrapeStockDetail(paper: string): Promise<Stock | null> {
     return null;
   }
   const document = parseElement(html, 'body');
-  const details = parseStockDetails(document, paper);
-  const stock: Stock = {
-    'Papel': paper,
-    'Cotação': details['Cotação'] || '0,00',
-    'P/L': details['P/L'] || '0,00',
-    'P/VP': details['P/VP'] || '0,00'
-  };
+  const stock = parseStockDetails(document, paper);
   const stocks = addGrahamValueTo([stock]);
   return stocks[0];
 }
@@ -135,14 +121,87 @@ export async function scrapeStockDetail(paper: string): Promise<Stock | null> {
  * @param paper The stock ticker symbol.
  * @returns The populated stock object.
  */
+const CANONICAL_FIELDS = [
+  'Papel',
+  'Cotação',
+  'P/L',
+  'P/VP',
+  'PSR',
+  'Div.Yield',
+  'P/Ativo',
+  'P/Cap.Giro',
+  'P/EBIT',
+  'P/Ativ Circ.Liq',
+  'EV/EBIT',
+  'EV/EBITDA',
+  'Mrg Bruta',
+  'Mrg Ebit',
+  'Mrg. Líq.',
+  'Liq. Corr.',
+  'ROIC',
+  'ROE',
+  'Liq.2meses',
+  'Patrim. Líq',
+  'Dív.Líq/ Patrim.',
+  'Cresc. Rec.5a',
+];
+
+const DETAIL_LABEL_TO_HEADER: Record<string, string> = {
+  'Cotação': 'Cotação',
+  'P/L': 'P/L',
+  'P/VP': 'P/VP',
+  'PSR': 'PSR',
+  'Div. Yield': 'Div.Yield',
+  'P/Ativos': 'P/Ativo',
+  'P/Cap. Giro': 'P/Cap.Giro',
+  'P/EBIT': 'P/EBIT',
+  'P/Ativ Circ Liq': 'P/Ativ Circ.Liq',
+  'EV / EBIT': 'EV/EBIT',
+  'EV / EBITDA': 'EV/EBITDA',
+  'Marg. Bruta': 'Mrg Bruta',
+  'Marg. EBIT': 'Mrg Ebit',
+  'Marg. Líquida': 'Mrg. Líq.',
+  'Liquidez Corr': 'Liq. Corr.',
+  'ROIC': 'ROIC',
+  'ROE': 'ROE',
+  'Patrim. Líq': 'Patrim. Líq',
+  'Dív Líq / Patrim': 'Dív.Líq/ Patrim.',
+  'Vol $ méd (2m)': 'Liq.2meses',
+  'Cres. Rec (5a)': 'Cresc. Rec.5a',
+};
+
+const MIN_EXPECTED_DETAIL_FIELDS = 5;
+
+function buildStockInCanonicalOrder(raw: Record<string, string | null>): Stock {
+  const stock: Stock = {};
+  for (const field of CANONICAL_FIELDS) {
+    if (raw[field] !== undefined) {
+      stock[field] = raw[field];
+    }
+  }
+  for (const key of Object.keys(raw)) {
+    if (stock[key] === undefined) {
+      stock[key] = raw[key];
+    }
+  }
+  return stock;
+}
+
 function parseStockDetails(document: Element, paper: string): Stock {
   const labels = Array.from(document.querySelectorAll('td.label'))
     .map((element: Element) => element.textContent.replaceAll('?', '').trim());
   const data = Array.from(document.querySelectorAll('td.data'))
     .map((element: Element) => element.textContent.trim());
-  const stock: Stock = { 'Papel': paper };
-  labels.map((label: string, index: number) => {
-    stock[label] = data[index];
+  const raw: Record<string, string | null> = { 'Papel': paper };
+  labels.forEach((label: string, index: number) => {
+    const header = DETAIL_LABEL_TO_HEADER[label];
+    if (header && raw[header] === undefined) {
+      raw[header] = data[index];
+    }
   });
-  return stock;
+  const fieldCount = Object.keys(raw).length - 1;
+  if (fieldCount < MIN_EXPECTED_DETAIL_FIELDS) {
+    console.warn(`[parseStockDetails] ${paper}: only ${fieldCount} fields parsed — DETAIL_LABEL_TO_HEADER may be out of date`);
+  }
+  return buildStockInCanonicalOrder(raw);
 }

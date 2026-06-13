@@ -1,1 +1,1 @@
-export type Stock = { [header: string]: string };
+export type Stock = { [header: string]: string | null };
